@@ -1,4 +1,14 @@
+import { useState } from 'react';
+
 export default function QuestionInput({ placeholder, theme, onSubmit }) {
+  const [value, setValue] = useState('');
+
+  const handleSubmit = () => {
+    if (value.trim()) {
+      onSubmit?.(value.trim());
+    }
+  };
+
   return (
     <div className="relative">
       <div
@@ -11,6 +21,8 @@ export default function QuestionInput({ placeholder, theme, onSubmit }) {
       >
         <input
           type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
           className={`
             flex-1 px-5 py-4 bg-transparent outline-none
@@ -18,11 +30,11 @@ export default function QuestionInput({ placeholder, theme, onSubmit }) {
           `}
           style={{ color: theme.text }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') onSubmit?.();
+            if (e.key === 'Enter') handleSubmit();
           }}
         />
         <button
-          onClick={onSubmit}
+          onClick={handleSubmit}
           className="mr-3 p-2.5 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer"
           style={{ backgroundColor: theme.primary }}
         >

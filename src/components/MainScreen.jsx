@@ -13,10 +13,11 @@ const mascots = {
   '12-15': TeenOtter,
 };
 
-export default function MainScreen({ ageGroup, theme, onBack }) {
+export default function MainScreen({ ageGroup, theme, onBack, onStartChat }) {
   const [mood, setMood] = useState('normal');
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [showResponse, setShowResponse] = useState(false);
+  const [questionText, setQuestionText] = useState('');
 
   const Mascot = mascots[ageGroup];
   const placeholder = theme.questionPlaceholders[mood];
@@ -135,7 +136,7 @@ export default function MainScreen({ ageGroup, theme, onBack }) {
           <QuestionInput
             placeholder={placeholder}
             theme={theme}
-            onSubmit={handleSubmit}
+            onSubmit={(text) => onStartChat(text)}
           />
         </section>
 
