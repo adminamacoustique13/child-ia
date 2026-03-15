@@ -71,8 +71,8 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// SPA fallback
-app.get('*', (req, res) => {
+// SPA fallback (Express v5 syntax)
+app.get('{*path}', (req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
