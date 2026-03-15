@@ -75,6 +75,9 @@
 <body class="bg-gradient-to-br from-orange-50 via-purple-50 to-blue-50 min-h-screen">
   <div id="root"></div>
 
+  <!-- Clé API chargée depuis config.js (gitignored) -->
+  <script src="config.js"></script>
+
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
 
@@ -283,7 +286,7 @@
 
     /* ── Main App ── */
     function App() {
-      const [apiKey, setApiKey] = useState('');
+      const [apiKey, setApiKey] = useState(window.ANTHROPIC_API_KEY || '');
       const [messages, setMessages] = useState([]);
       const [input, setInput] = useState('');
       const [loading, setLoading] = useState(false);
