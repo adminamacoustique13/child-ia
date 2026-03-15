@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { BabyOtter, SchoolOtter, TeenOtter } from './OtterMascot';
-import { subjects } from '../data';
 
 const mascots = {
   '4-7': BabyOtter,
@@ -8,90 +7,338 @@ const mascots = {
   '12-15': TeenOtter,
 };
 
-/* ── Map artefact id to ArtifactCard type ── */
 const ARTIFACT_MAP = { espace: 'space', corps: 'heart', guerre: 'war' };
 
-/* ── Heart SVG ── */
-function HeartArtifact() {
-  return (
-    <div className="flex flex-col items-center gap-3">
-      <svg viewBox="0 0 120 120" width="90" height="90" className="animate-pulse-soft">
-        <defs>
-          <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FF6B6B" />
-            <stop offset="100%" stopColor="#EE5A24" />
-          </linearGradient>
-        </defs>
-        <path d="M60 100 C30 75 5 55 5 35 C5 18 18 5 33 5 C43 5 52 11 60 22 C68 11 77 5 87 5 C102 5 115 18 115 35 C115 55 90 75 60 100Z" fill="url(#hg)" />
-        <path d="M45 45 L55 35 L60 50 L65 30 L75 45" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
-      </svg>
-      <p className="text-xs text-gray-500 font-semibold text-center">
-        Le coeur bat environ <strong className="text-red-500">100 000 fois par jour</strong> et pompe
-        assez de sang pour remplir un camion-citerne chaque semaine.
-      </p>
-    </div>
-  );
-}
+/* ═══════════════════════════════════════════════════
+   ARTEFACT ESPACE — Canvas interactif
+   ═══════════════════════════════════════════════════ */
+const PLANETS = [
+  {
+    name: 'Mercure', radius: 50, size: 5, color: '#B0BEC5', speed: 4.15,
+    fact: 'Mercure est la planète la plus rapide : elle fait le tour du Soleil en seulement 88 jours. Mais une seule journée là-bas dure 59 jours terrestres !',
+  },
+  {
+    name: 'Terre', radius: 85, size: 8, color: '#3B82F6', speed: 1,
+    fact: 'La Terre met 365 jours pour faire le tour du Soleil. Mais elle tourne sur elle-même en 24h — c\'est pour ça qu\'on a le jour et la nuit.',
+  },
+  {
+    name: 'Mars', radius: 115, size: 6, color: '#EF4444', speed: 0.53,
+    fact: 'Une journée sur Mars dure presque comme sur Terre : 24h37. Mais une année martienne, c\'est 687 jours. Les saisons durent deux fois plus longtemps !',
+  },
+];
 
-/* ── Solar System SVG ── */
 function SpaceArtifact() {
-  const orbitStyle = (radius, duration) => ({
-    animation: `spin ${duration}s linear infinite`,
-    transformOrigin: '110px 110px',
-  });
+  const canvasRef = useRef(null);
+  const [speed, setSpeed] = useState(1);
+  const [selected, setSelected] = useState(null);
+  const anglesRef = useRef(PLANETS.map(() => Math.random() * Math.PI * 2));
+  const animRef = useRef(null);
+  const lastTimeRef = useRef(null);
+
+  const W = 280, H = 280, CX = W / 2, CY = H / 2;
+
+  const draw = useCallback((timestamp) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (!lastTimeRef.current) lastTimeRef.current = timestamp;
+    const dt = (timestamp - lastTimeRef.current) / 1000;
+    lastTimeRef.current = timestamp;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Orbits
+    PLANETS.forEach((p) => {
+      ctx.beginPath();
+      ctx.arc(CX, CY, p.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = '#E5E7EB';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // Sun glow
+    const grad = ctx.createRadialGradient(CX, CY, 4, CX, CY, 22);
+    grad.addColorStop(0, '#FFA500');
+    grad.addColorStop(0.6, '#FFD93D');
+    grad.addColorStop(1, 'rgba(255,217,61,0)');
+    ctx.beginPath();
+    ctx.arc(CX, CY, 22, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    // Sun core
+    ctx.beginPath();
+    ctx.arc(CX, CY, 12, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFA500';
+    ctx.fill();
+
+    // Planets
+    PLANETS.forEach((p, i) => {
+      anglesRef.current[i] += p.speed * speed * dt * 0.5;
+      const a = anglesRef.current[i];
+      const x = CX + Math.cos(a) * p.radius;
+      const y = CY + Math.sin(a) * p.radius;
+
+      // Shadow
+      ctx.beginPath();
+      ctx.arc(x + 1, y + 1, p.size + 1, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.fill();
+
+      // Planet
+      ctx.beginPath();
+      ctx.arc(x, y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+
+      // Highlight on selected
+      if (selected === i) {
+        ctx.beginPath();
+        ctx.arc(x, y, p.size + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Earth continents hint
+      if (p.name === 'Terre') {
+        ctx.beginPath();
+        ctx.arc(x + 2, y - 1, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#22C55E';
+        ctx.fill();
+      }
+
+      // Label
+      ctx.font = '500 10px Quicksand, sans-serif';
+      ctx.fillStyle = '#9CA3AF';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, x, y - p.size - 6);
+    });
+
+    animRef.current = requestAnimationFrame(draw);
+  }, [speed, selected]);
+
+  useEffect(() => {
+    animRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [draw]);
+
+  const handleClick = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+
+    let clicked = null;
+    PLANETS.forEach((p, i) => {
+      const a = anglesRef.current[i];
+      const x = CX + Math.cos(a) * p.radius;
+      const y = CY + Math.sin(a) * p.radius;
+      const dist = Math.sqrt((mx - x) ** 2 + (my - y) ** 2);
+      if (dist < p.size + 10) clicked = i;
+    });
+    setSelected(clicked);
+  };
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-        .orbit-a { animation: spin 3s linear infinite; transform-origin: 110px 110px; }
-        .orbit-b { animation: spin 5s linear infinite; transform-origin: 110px 110px; }
-        .orbit-c { animation: spin 8s linear infinite; transform-origin: 110px 110px; }
-      `}</style>
-      <svg viewBox="0 0 220 220" width="180" height="180">
-        <circle cx="110" cy="110" r="40" fill="none" stroke="#E5E7EB" strokeWidth="1" strokeDasharray="3 3" />
-        <circle cx="110" cy="110" r="65" fill="none" stroke="#E5E7EB" strokeWidth="1" strokeDasharray="3 3" />
-        <circle cx="110" cy="110" r="90" fill="none" stroke="#E5E7EB" strokeWidth="1" strokeDasharray="3 3" />
-        <circle cx="110" cy="110" r="16" fill="#FFD93D" />
-        <circle cx="110" cy="110" r="10" fill="#FFA500" />
-        <g className="orbit-a"><circle cx="150" cy="110" r="5" fill="#B0BEC5" /></g>
-        <g className="orbit-b"><circle cx="175" cy="110" r="7" fill="#3B82F6" /></g>
-        <g className="orbit-c"><circle cx="200" cy="110" r="6" fill="#EF4444" /></g>
-      </svg>
-      <p className="text-xs text-gray-500 font-semibold text-center">
-        La lumiere du Soleil met <strong className="text-amber-500">8 minutes</strong> pour arriver
-        sur Terre — tu regardes toujours le soleil du passe.
+    <div className="flex flex-col items-center gap-4">
+      <canvas
+        ref={canvasRef}
+        width={W}
+        height={H}
+        onClick={handleClick}
+        className="cursor-pointer"
+        style={{ width: '100%', maxWidth: 280, aspectRatio: '1' }}
+      />
+
+      {/* Speed slider */}
+      <div className="flex items-center gap-3 w-full max-w-[250px]">
+        <span className="text-xs text-gray-400">🐢</span>
+        <input
+          type="range"
+          min="0.1"
+          max="5"
+          step="0.1"
+          value={speed}
+          onChange={(e) => setSpeed(parseFloat(e.target.value))}
+          className="flex-1 h-1.5 rounded-full appearance-none bg-gray-200 accent-blue-500 cursor-pointer"
+        />
+        <span className="text-xs text-gray-400">🚀</span>
+        <span className="text-[10px] font-bold text-gray-400 w-8 text-right">x{speed.toFixed(1)}</span>
+      </div>
+
+      {/* Planet info card */}
+      {selected !== null && (
+        <div
+          className="w-full p-3 rounded-xl border text-sm leading-relaxed animate-fade-in-up"
+          style={{
+            backgroundColor: `${PLANETS[selected].color}10`,
+            borderColor: `${PLANETS[selected].color}30`,
+            color: '#374151',
+          }}
+        >
+          <span className="font-bold" style={{ color: PLANETS[selected].color }}>
+            {PLANETS[selected].name}
+          </span>
+          {' — '}
+          {PLANETS[selected].fact}
+        </div>
+      )}
+
+      {selected === null && (
+        <p className="text-xs text-gray-400 italic">Clique sur une planète pour en savoir plus</p>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   ARTEFACT CORPS — Cœur interactif avec BPM
+   ═══════════════════════════════════════════════════ */
+function HeartArtifact() {
+  const [mode, setMode] = useState('avant'); // 'avant' | 'apres'
+  const bpm = mode === 'avant' ? 75 : 150;
+  const duration = 60 / bpm; // seconds per beat
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      {/* Heart SVG */}
+      <div className="relative">
+        <svg
+          viewBox="0 0 120 120"
+          width="100"
+          height="100"
+          style={{ animation: `heartbeat ${duration}s ease-in-out infinite` }}
+        >
+          <defs>
+            <linearGradient id="heart-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={mode === 'avant' ? '#FF6B6B' : '#FF0000'} />
+              <stop offset="100%" stopColor={mode === 'avant' ? '#EE5A24' : '#CC0000'} />
+            </linearGradient>
+          </defs>
+          <path
+            d="M60 100 C30 75 5 55 5 35 C5 18 18 5 33 5 C43 5 52 11 60 22 C68 11 77 5 87 5 C102 5 115 18 115 35 C115 55 90 75 60 100Z"
+            fill="url(#heart-grad)"
+          />
+          <path
+            d="M40 45 L50 35 L57 50 L63 28 L70 45 L80 45"
+            stroke="white"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.7"
+          />
+        </svg>
+        <style>{`
+          @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            15% { transform: scale(${mode === 'avant' ? 1.08 : 1.18}); }
+            30% { transform: scale(1); }
+            45% { transform: scale(${mode === 'avant' ? 1.05 : 1.12}); }
+          }
+        `}</style>
+      </div>
+
+      {/* BPM display */}
+      <div className="flex items-baseline gap-1.5">
+        <span
+          className="text-3xl font-bold tabular-nums transition-all duration-500"
+          style={{ color: mode === 'avant' ? '#EF4444' : '#DC2626' }}
+        >
+          {bpm}
+        </span>
+        <span className="text-xs font-semibold text-gray-400">BPM</span>
+      </div>
+
+      {/* Toggle buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setMode('avant')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl border-2 transition-all duration-300 cursor-pointer ${
+            mode === 'avant'
+              ? 'bg-red-50 border-red-300 text-red-600 shadow-sm'
+              : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+          }`}
+        >
+          😌 Avant effort
+        </button>
+        <button
+          onClick={() => setMode('apres')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl border-2 transition-all duration-300 cursor-pointer ${
+            mode === 'apres'
+              ? 'bg-red-50 border-red-300 text-red-600 shadow-sm'
+              : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+          }`}
+        >
+          🏃 Après effort
+        </button>
+      </div>
+
+      <p className="text-xs text-gray-500 text-center max-w-[260px] leading-relaxed">
+        {mode === 'avant'
+          ? 'Au repos, ton cœur bat environ 75 fois par minute. Il envoie 5 litres de sang dans tout ton corps chaque minute.'
+          : 'Après un sprint, ton cœur peut monter à 150 BPM ! Il pompe maintenant 20 litres par minute pour envoyer plus d\'oxygène à tes muscles.'}
       </p>
     </div>
   );
 }
 
-/* ── War context card ── */
+/* ═══════════════════════════════════════════════════
+   ARTEFACT GUERRE — Card éditoriale statique
+   ═══════════════════════════════════════════════════ */
 function WarArtifact() {
   return (
-    <div className="flex gap-3 items-start">
-      <div className="text-2xl mt-0.5">🕊️</div>
-      <div>
-        <p className="text-sm text-gray-700 leading-relaxed">
-          La guerre, c'est quand des pays n'arrivent plus a se parler et utilisent
-          des armees a la place des mots. Au XXe siecle, les deux guerres
-          mondiales ont cause la mort de <strong className="text-orange-600">plus de 80 millions de personnes</strong>.
+    <div className="flex flex-col gap-4">
+      {/* Main text */}
+      <div className="flex gap-3 items-start">
+        <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+          <span className="text-xl">🕊️</span>
+        </div>
+        <div>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            La guerre, c'est quand des pays n'arrivent plus à se parler et utilisent
+            des armées à la place des mots. Au XX<sup>e</sup> siècle, les deux guerres
+            mondiales ont causé la mort de <strong className="text-orange-600">plus de 80 millions de personnes</strong>.
+          </p>
+          <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+            Aujourd'hui, des organisations comme l'ONU et des traités internationaux
+            essaient d'aider les pays à résoudre leurs conflits sans violence.
+          </p>
+        </div>
+      </div>
+
+      {/* Citation */}
+      <div
+        className="px-4 py-3 rounded-xl"
+        style={{
+          background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A40 100%)',
+          borderLeft: '3px solid #F59E0B',
+        }}
+      >
+        <p className="text-sm italic text-amber-800 leading-relaxed">
+          « La paix n'est pas l'absence de guerre, c'est une vertu, un état d'esprit,
+          une volonté de bienveillance, de confiance, de justice. »
         </p>
-        <p className="text-xs text-gray-400 mt-2 italic">
-          Aujourd'hui, des organisations comme l'ONU essaient d'aider les pays a resoudre
-          leurs problemes sans violence.
+        <p className="text-xs text-amber-600 mt-1.5 font-semibold">
+          — Baruch Spinoza, philosophe (1632–1677)
         </p>
       </div>
     </div>
   );
 }
 
-/* ── Artifact Card ── */
+/* ═══════════════════════════════════════════════════
+   ARTIFACT CARD — Wrapper avec label "Explorer"
+   ═══════════════════════════════════════════════════ */
 function ArtifactCard({ type }) {
   const labels = {
     heart: { icon: '🫀', title: 'Le corps humain' },
     space: { icon: '🚀', title: "L'Espace" },
-    war: { icon: '🕊️', title: 'Artefact contextuel' },
+    war: { icon: '🕊️', title: 'Comprendre le monde' },
   };
   const components = { heart: HeartArtifact, space: SpaceArtifact, war: WarArtifact };
   const info = labels[type];
@@ -99,13 +346,18 @@ function ArtifactCard({ type }) {
 
   return (
     <div
-      className="mt-3 p-4 border-2 border-dashed animate-fade-in-up"
-      style={{ borderRadius: '16px', borderColor: '#D8B4FE', backgroundColor: '#FAF5FF' }}
+      className="mt-3 p-5 border-2 animate-fade-in-up overflow-hidden"
+      style={{
+        borderRadius: '16px',
+        borderColor: '#D8B4FE',
+        backgroundColor: '#FEFCFF',
+        boxShadow: '0 2px 12px rgba(168, 85, 247, 0.08)',
+      }}
     >
-      <div className="flex items-center gap-2 mb-3 pb-2" style={{ borderBottom: '1px solid #EDE9FE' }}>
+      <div className="flex items-center gap-2 mb-4 pb-2.5" style={{ borderBottom: '1px solid #F3E8FF' }}>
         <span>{info.icon}</span>
         <span className="text-xs font-bold text-purple-500 uppercase tracking-wider">
-          Artefact — {info.title}
+          Explorer — {info.title}
         </span>
       </div>
       <Comp />
@@ -142,7 +394,9 @@ function TypingDots() {
   );
 }
 
-/* ── Main ChatScreen ── */
+/* ═══════════════════════════════════════════════════
+   MAIN CHAT SCREEN
+   ═══════════════════════════════════════════════════ */
 export default function ChatScreen({ ageGroup, theme, onBack, initialQuestion }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -193,7 +447,6 @@ export default function ChatScreen({ ageGroup, theme, onBack, initialQuestion })
     }
   };
 
-  // Send initial question on mount
   useEffect(() => {
     if (initialQuestion && !sentInitial.current) {
       sentInitial.current = true;
