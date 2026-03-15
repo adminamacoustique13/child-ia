@@ -8,27 +8,8 @@ const mascots = {
   '12-15': TeenOtter,
 };
 
-/* ── Artifact detection ── */
-function detectArtifact(question) {
-  const q = question.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (/coeur|sang|corps|poumon|muscle|os|squelette|cerveau|digestion|estomac|respir/.test(q)) return 'heart';
-  if (/espace|planete|soleil|lune|etoile|mars|jupiter|terre|satellite|orbite|tourne|galaxie|cosmos|astronaute|fusee|ciel|venus|saturne|neptune/.test(q)) return 'space';
-  if (/guerre|hitler|mort|soldat|armee|bombe|combat|conflit|arme|violence|nazi/.test(q)) return 'war';
-  return null;
-}
-
-/* ── Split last sentence as aporia ── */
-function splitAporia(text) {
-  const trimmed = text.trim();
-  const re = /([^.!?]*[.!?]+)\s*/g;
-  const sentences = [];
-  let m;
-  while ((m = re.exec(trimmed)) !== null) sentences.push(m[1].trim());
-  if (sentences.length === 0) return { body: '', aporia: trimmed };
-  if (sentences.length === 1) return { body: '', aporia: sentences[0] };
-  const aporia = sentences.pop();
-  return { body: sentences.join(' '), aporia };
-}
+/* ── Map artefact id to ArtifactCard type ── */
+const ARTIFACT_MAP = { espace: 'space', corps: 'heart', guerre: 'war' };
 
 /* ── Heart SVG ── */
 function HeartArtifact() {
@@ -198,8 +179,13 @@ export default function ChatScreen({ ageGroup, theme, onBack, initialQuestion })
         throw new Error(data.error || `Erreur ${res.status}`);
       }
 
-      const artifact = detectArtifact(question);
-      setMessages((prev) => [...prev, { role: 'ai', text: data.text, artifact }]);
+      const artifact = data.artefact ? ARTIFACT_MAP[data.artefact] || null : null;
+      setMessages((prev) => [...prev, {
+        role: 'ai',
+        body: data.reponse || '',
+        aporia: data.aporie || '',
+        artifact,
+      }]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -275,7 +261,6 @@ export default function ChatScreen({ ageGroup, theme, onBack, initialQuestion })
             );
           }
 
-          const { body, aporia } = splitAporia(msg.text);
           return (
             <div key={i} className="flex justify-start mb-4 animate-fade-in-up">
               <div className="max-w-[85%]">
@@ -284,18 +269,20 @@ export default function ChatScreen({ ageGroup, theme, onBack, initialQuestion })
                   <span className={`text-xs font-bold ${theme.font}`} style={{ color: theme.textLight }}>{theme.mascotName}</span>
                 </div>
                 <div className="bg-white px-5 py-4 rounded-2xl rounded-tl-md shadow-sm border border-gray-100">
-                  {body && <p className={`text-sm text-gray-700 leading-relaxed mb-3 ${theme.font}`}>{body}</p>}
-                  <div
-                    className="px-4 py-2.5 rounded-lg"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.highlight}20, ${theme.accent}15)`,
-                      borderLeft: `3px solid ${theme.highlight}`,
-                    }}
-                  >
-                    <p className={`text-sm italic font-semibold leading-relaxed ${theme.font}`} style={{ color: theme.text }}>
-                      🌀 {aporia}
-                    </p>
-                  </div>
+                  {msg.body && <p className={`text-sm text-gray-700 leading-relaxed mb-3 ${theme.font}`}>{msg.body}</p>}
+                  {msg.aporia && (
+                    <div
+                      className="px-4 py-2.5 rounded-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.highlight}20, ${theme.accent}15)`,
+                        borderLeft: `3px solid ${theme.highlight}`,
+                      }}
+                    >
+                      <p className={`text-sm italic font-semibold leading-relaxed ${theme.font}`} style={{ color: theme.text }}>
+                        🌀 {msg.aporia}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 {msg.artifact && <ArtifactCard type={msg.artifact} />}
               </div>
