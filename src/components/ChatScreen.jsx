@@ -11,9 +11,9 @@ const mascots = {
 /* ── Artifact detection ── */
 function detectArtifact(question) {
   const q = question.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (/coeur|sang|corps|poumon/.test(q)) return 'heart';
-  if (/espace|planete|soleil|lune|etoile|mars|jupiter/.test(q)) return 'space';
-  if (/guerre|hitler|mort|soldat|armee|bombe/.test(q)) return 'war';
+  if (/coeur|sang|corps|poumon|muscle|os|squelette|cerveau|digestion|estomac|respir/.test(q)) return 'heart';
+  if (/espace|planete|soleil|lune|etoile|mars|jupiter|terre|satellite|orbite|tourne|galaxie|cosmos|astronaute|fusee|ciel|venus|saturne|neptune/.test(q)) return 'space';
+  if (/guerre|hitler|mort|soldat|armee|bombe|combat|conflit|arme|violence|nazi/.test(q)) return 'war';
   return null;
 }
 
